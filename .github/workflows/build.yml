@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-kpm:
+    build-kpm:
     name: Compile KPM (Kernel Module)
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +31,7 @@ jobs:
       - name: Compile KPM Binary
         run: |
           make ARCH=arm64 \
+               CC=aarch64-linux-gnu-gcc \
                CROSS_COMPILE=aarch64-linux-gnu- \
                KDIR=$PWD/kernel-headers \
                all
