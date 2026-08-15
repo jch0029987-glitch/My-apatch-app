@@ -1,13 +1,48 @@
-name: Build Android APK
+name: Build Android APK & KPM
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-kpm:
+    name: Compile KPM (Kernel Module)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Cross-Compilation Toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu make build-essential libssl-dev bc
+
+      - name: Fetch Generic Kernel Headers / Setup Build Tree
+        run: |
+          git clone --depth 1 https://github.com/torvalds/linux.git kernel-headers || true
+          cd kernel-headers
+          make ARCH=arm64 defconfig
+          make ARCH=arm64 prepare
+          make ARCH=arm64 scripts
+
+      - name: Compile KPM Binary
+        run: |
+          make ARCH=arm64 \
+               CROSS_COMPILE=aarch64-linux-gnu- \
+               KDIR=$PWD/kernel-headers \
+               all
+
+      - name: Upload KPM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-control-kpm
+          path: bridge_control_kpm.ko
+
+  build-apk:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
