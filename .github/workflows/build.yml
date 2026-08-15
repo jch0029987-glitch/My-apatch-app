@@ -18,20 +18,21 @@ jobs:
       - name: Install Cross-Compilation Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu make build-essential libssl-dev bc bison flex
+          sudo apt-get install -y gcc-aarch64-linux-gnu make build-essential libssl-dev bc bison flex libelf-dev
 
-      - name: Fetch Generic Kernel Headers & Configure
+      - name: Fetch Generic Kernel Headers & Fully Prepare Symbols
         run: |
           git clone --depth 1 https://github.com/torvalds/linux.git kernel-headers
           cd kernel-headers
-          # Set up environment variables globally for this subshell
+          
+          # Export global architecture and compiler toolchain variables
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CC=aarch64-linux-gnu-gcc
           
+          # Configure and generate the mandatory Module.symvers and symbol configurations
           make defconfig
-          make prepare
-          make scripts
+          make modules_prepare
 
       - name: Compile KPM Binary
         run: |
@@ -39,6 +40,7 @@ jobs:
           export CROSS_COMPILE=aarch64-linux-gnu-
           export CC=aarch64-linux-gnu-gcc
           
+          # Build module pointing to the fully prepared kernel headers directory
           make KDIR=$PWD/kernel-headers all
 
       - name: Upload KPM Artifact
