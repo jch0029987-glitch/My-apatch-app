@@ -17,39 +17,62 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         
         textView = TextView(this).apply {
-            text = "Hello World!\nChecking APatch Root (Background)..."
-            textSize = 18f
+            text = "Requesting APatch SuperKey & Root Access...\nCheck your root manager prompt."
+            textSize = 16f
             setPadding(32, 32, 32, 32)
         }
         
         setContentView(textView)
 
-        // Run root checks on a background thread to prevent UI freezing/ANR crashes
+        // Run SuperKey verification asynchronously to avoid UI freezing
         lifecycleScope.launch {
-            val rootResult = checkRootStatusAsync()
-            textView.text = "Hello World!\n\n$rootResult"
+            val result = verifySuperKeyAndRoot()
+            textView.text = result
         }
     }
 
-    private suspend fun checkRootStatusAsync(): String = withContext(Dispatchers.IO) {
+    private suspend fun verifySuperKeyAndRoot(): String = withContext(Dispatchers.IO) {
         try {
-            // Try standard su path first
+            // Executing the root shell prompt which forces APatch to validate 
+            // the SuperKey/authorization state for this app package.
             val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            
             val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val errorReader = BufferedReader(InputStreamReader(process.errorStream))
+            
             val output = StringBuilder()
             var line: String?
             while (reader.readLine().also { line = it } != null) {
                 output.append(line).append("\n")
             }
-            process.waitFor()
             
-            if (output.isNotEmpty()) {
-                "Root Access Granted:\n$output"
-            } else {
-                "Root execution returned empty output."
+            val errorOutput = StringBuilder()
+            while (errorReader.readLine().also { line = it } != null) {
+                errorOutput.append(line).append("\n")
             }
+            
+            val exitCode = process.waitFor()
+
+            // Detailed error checking and response handling
+            return@withContext when {
+                exitCode == 0 && output.contains("uid=0(root)") -> {
+                    "SUCCESS: SuperKey Authenticated & Root Granted!\n\nUser Context:\n$output"
+                }
+                exitCode != 0 -> {
+                    val reason = if (errorOutput.isNotEmpty()) errorOutput.toString() else "User denied root request or invalid SuperKey."
+                    "ACCESS DENIED / ERROR:\n$reason\n(Exit Code: $exitCode)"
+                }
+                else -> {
+                    "WARNING: Process exited cleanly, but root context was not fully confirmed.\nOutput: $output"
+                }
+            }
+            
+        } catch (e: java.io.IOException) {
+            return@withContext "ERROR: Execution failed. The 'su' binary could not be found or launched.\nDetails: ${e.localizedMessage}"
+        } catch (e: SecurityException) {
+            return@withContext "SECURITY ERROR: Policy violation or missing permission context.\nDetails: ${e.localizedMessage}"
         } catch (e: Exception) {
-            "Root Access Denied or Unavailable:\n${e.message}"
+            return@withContext "UNKNOWN EXCEPTION:\n${e.localizedMessage}"
         }
     }
 }
