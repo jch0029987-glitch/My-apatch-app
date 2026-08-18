@@ -1,18 +1,17 @@
-// bridge_control_kpm.c
-#include <linux/module.h>
+#include <kpmodule.h>  // Essential KernelPatch Macros and Definitions
+#include <compiler.h>  // Compiler helpers for naked symbols and optimizations
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
 #include <linux/string.h>
-#include <linux/uaccess.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+#include <linux/uidgid.h>
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Jeremy");
-MODULE_DESCRIPTION("APatch Hardened Control Hub KPM");
-MODULE_VERSION("1.4");
+// 1. Declare explicit KPM Metadata instead of standard LKM macros
+KPM_NAME("bridge-control-kpm");
+KPM_VERSION("1.4");
+KPM_LICENSE("GPL");
 
 static struct kobject *bridge_kobj = NULL;
 static int hub_status_value = 1; 
@@ -55,7 +54,8 @@ static ssize_t status_store(struct kobject *kobj, struct kobj_attribute *attr, c
     if (mutex_lock_interruptible(&bridge_lock))
         return -ERESTARTSYS;
 
-    ret = kstrtoint_from_user(buf, count, 10, &parsed_value);
+    // FIX: sysfs provides a kernel-space buffer. Do not use _from_user variants.
+    ret = kstrtoint(buf, 10, &parsed_value);
     if (ret < 0) {
         mutex_unlock(&bridge_lock);
         return ret; 
@@ -76,9 +76,10 @@ static ssize_t status_store(struct kobject *kobj, struct kobj_attribute *attr, c
 
 static struct kobj_attribute hub_status_attr = __ATTR(status, 0664, status_show, status_store);
 
-static int __init bridge_hub_init(void) {
+// 2. KPM Lifecycle Hook instead of __init bridge_hub_init
+static int bridge_hub_init(int argc, char **argv) {
     int error = 0;
-    pr_info("BridgeHub: Initializing hardened APatch control module\n");
+    pr_info("BridgeHub: Initializing hardened APatch control KPM\n");
 
     // Create under /sys/kernel/bridge_hub
     bridge_kobj = kobject_create_and_add("bridge_hub", kernel_kobj);
@@ -99,7 +100,8 @@ static int __init bridge_hub_init(void) {
     return 0;
 }
 
-static void __exit bridge_hub_exit(void) {
+// 3. KPM Lifecycle Exit function
+static void bridge_hub_exit(void) {
     pr_info("BridgeHub: Executing safe teardown\n");
     
     if (mutex_lock_interruptible(&bridge_lock) == 0) {
@@ -112,5 +114,6 @@ static void __exit bridge_hub_exit(void) {
     }
 }
 
-module_init(bridge_hub_init);
-module_exit(bridge_hub_exit);
+// Register hooks via KPM specific macros
+KPM_INIT(bridge_hub_init);
+KPM_EXIT(bridge_hub_exit);
