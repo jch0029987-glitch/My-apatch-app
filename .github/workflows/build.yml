@@ -22,19 +22,15 @@ jobs:
 
       - name: Fetch KernelPatch Source Headers
         run: |
-          git clone --depth 1 https://github.com kp-source
+          BASE_URL="https://github.com"
+          REPO_PATH="bmax121/KernelPatch.git"
+          git clone --depth 1 "$BASE_URL/$REPO_PATH" kp-source
 
       - name: Compile KPM Target File
         run: |
           export CC=aarch64-linux-gnu-gcc
           export LD=aarch64-linux-gnu-ld
-          
-          # Compile the source file into an independent relocatable object.
-          $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
-              -I$PWD/kp-source/include \
-              -c bridge_control_kpm.c -o bridge_control_kpm.o
-          
-          # Link into the definitive relocatable .kpm layout recognized by APatch
+          $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics -I$PWD/kp-source/include -c bridge_control_kpm.c -o bridge_control_kpm.o
           $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
 
       - name: Upload Raw KPM Artifact
