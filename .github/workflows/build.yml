@@ -1,4 +1,4 @@
-name: Build Android APK & KPM
+name: Build Independent App and KPM Binary
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-kpm:
-    name: Compile KPM (Kernel Module)
+    name: Compile Standalone KPM Driver
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,61 +18,54 @@ jobs:
       - name: Install Cross-Compilation Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu make build-essential libssl-dev bc bison flex libelf-dev
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential
 
-      - name: Fetch Generic Kernel Headers & Fully Prepare Symbols
+      - name: Fetch KernelPatch Source Headers
         run: |
-          git clone --depth 1 https://github.com/torvalds/linux.git kernel-headers
-          cd kernel-headers
-          
-          # Export global architecture and compiler toolchain variables
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
-          export CC=aarch64-linux-gnu-gcc
-          
-          # Configure and generate the mandatory Module.symvers and symbol configurations
-          make defconfig
-          make modules_prepare
+          git clone --depth 1 https://github.com kp-source
 
-      - name: Compile KPM Binary
+      - name: Compile KPM Target File
         run: |
-          export ARCH=arm64
-          export CROSS_COMPILE=aarch64-linux-gnu-
           export CC=aarch64-linux-gnu-gcc
+          export LD=aarch64-linux-gnu-ld
           
-          # Build module pointing to the fully prepared kernel headers directory
-          make KDIR=$PWD/kernel-headers all
+          # Compile the source file into an independent relocatable object.
+          $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
+              -I$PWD/kp-source/include \
+              -c bridge_control_kpm.c -o bridge_control_kpm.o
+          
+          # Link into the definitive relocatable .kpm layout recognized by APatch
+          $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
 
-      - name: Upload KPM Artifact
+      - name: Upload Raw KPM Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bridge-control-kpm
-          path: bridge_control_kpm.ko
+          name: bridge-control-driver
+          path: bridge_control_kpm.kpm
 
   build-apk:
-    name: Build Android APK
+    name: Build Pure Android App
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
-      with:
-        gradle-version: '8.5'
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
 
-    - name: Build Debug APK
-      run: gradle :app:assembleDebug
+      - name: Build Pure Debug APK
+        run: ./gradlew :app:assembleDebug
 
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload Clean APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-android-app
+          path: app/build/outputs/apk/debug/app-debug.apk
