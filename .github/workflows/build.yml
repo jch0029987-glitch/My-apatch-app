@@ -31,9 +31,9 @@ jobs:
           export CC=aarch64-linux-gnu-gcc
           export LD=aarch64-linux-gnu-ld
           
+          # FIX: Header files path updated to point directly to kp-source/kpmodule
           $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
-              -I$PWD/kp-source/kpmod/include \
-              -I$PWD/kp-source/src/include \
+              -I$PWD/kp-source/kpmodule \
               -c bridge_control_kpm.c -o bridge_control_kpm.o
               
           $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
@@ -63,7 +63,6 @@ jobs:
       with:
         gradle-version: '8.5'
 
-    # FIX: Reverted strictly back to your working global system Gradle task execution
     - name: Build Debug APK
       run: gradle :app:assembleDebug
 
