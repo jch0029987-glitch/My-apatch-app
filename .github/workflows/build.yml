@@ -18,22 +18,23 @@ jobs:
       - name: Install Cross-Compilation Toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential
+          sudo apt-get install -y gcc-aarch64-linux-gnu build-essential curl
 
       - name: Fetch KernelPatch Source Headers
         run: |
-          BASE_URL="https://github.com"
-          REPO_PATH="bmax121/KernelPatch.git"
-          git clone --depth 1 "$BASE_URL/$REPO_PATH" kp-source
+          mkdir -p kpm_include
+          # Directly download the explicit header mappings from the official repository upstream
+          curl -Lo kpm_include/kpmodule.h https://githubusercontent.com
+          curl -Lo kpm_include/compiler.h https://githubusercontent.com
 
       - name: Compile KPM Target File
         run: |
           export CC=aarch64-linux-gnu-gcc
           export LD=aarch64-linux-gnu-ld
           
-          # FIX: Header files path updated to point directly to kp-source/kpmodule
+          # Target the isolated local download directory directly via -I
           $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
-              -I$PWD/kp-source/kpmodule \
+              -I$PWD/kpm_include \
               -c bridge_control_kpm.c -o bridge_control_kpm.o
               
           $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
