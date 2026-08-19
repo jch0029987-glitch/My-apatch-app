@@ -30,7 +30,13 @@ jobs:
         run: |
           export CC=aarch64-linux-gnu-gcc
           export LD=aarch64-linux-gnu-ld
-          $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics -I$PWD/kp-source/include -c bridge_control_kpm.c -o bridge_control_kpm.o
+          
+          # FIX: Included both the explicit kpmod/include and src/include directories
+          $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
+              -I$PWD/kp-source/kpmod/include \
+              -I$PWD/kp-source/src/include \
+              -c bridge_control_kpm.c -o bridge_control_kpm.o
+              
           $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
 
       - name: Upload Raw KPM Artifact
