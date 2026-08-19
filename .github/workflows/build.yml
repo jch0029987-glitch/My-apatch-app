@@ -23,18 +23,25 @@ jobs:
       - name: Fetch KernelPatch Source Headers
         run: |
           mkdir -p kpm_include
-          # Directly download the explicit header mappings from the official repository upstream
-          curl -Lo kpm_include/kpmodule.h https://githubusercontent.com
-          curl -Lo kpm_include/compiler.h https://githubusercontent.com
+          
+          # Dynamically piece the domain together to block markdown parsing engine filters
+          PROTO="https://"
+          DOMAIN="://githubusercontent.com"
+          PATH_BASE="bmax121/KernelPatch/main/kpmodule"
+          
+          FULL_URL="${PROTO}${DOMAIN}/${PATH_BASE}"
+          
+          # Download using the dynamically generated non-stripped system paths
+          curl -Lo kpm_include/kpmodule.h "${FULL_URL}/kpmodule.h"
+          curl -Lo kpm_include/compiler.h "${FULL_URL}/compiler.h"
 
       - name: Compile KPM Target File
         run: |
           export CC=aarch64-linux-gnu-gcc
           export LD=aarch64-linux-gnu-ld
           
-          # Target the isolated local download directory directly via -I
           $CC -O2 -fno-pic -fno-stack-protector -mno-outline-atomics \
-              -I$PWD/kpm_include \
+              -I${{ github.workspace }}/kpm_include \
               -c bridge_control_kpm.c -o bridge_control_kpm.o
               
           $LD -r bridge_control_kpm.o -o bridge_control_kpm.kpm
@@ -72,3 +79,4 @@ jobs:
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/app-debug.apk
+        
